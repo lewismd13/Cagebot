@@ -1,5 +1,5 @@
-import { KoLClan, KoLClient, KoLUser, PrivateMessage } from "./KoLClient";
 import { Mutex } from "async-mutex";
+import { KoLClan, KoLClient, KoLUser, PrivateMessage } from "./KoLClient";
 
 type CagedStatus = {
   requester: KoLUser;
@@ -74,7 +74,8 @@ export class CageBot {
         console.log(`Processing whisper from ${message.who.name} (#${message.who.id})`);
         const processedMsg = message.msg.toLowerCase();
         if (processedMsg.startsWith("status")) await this.statusReport(message, true);
-        else if (processedMsg.startsWith("cage")) await this.becomeCaged(message);
+        else if (processedMsg.startsWith("cage")) await this.becomeCaged(message, false);
+        else if (processedMsg.startsWith("hamster")) await this.becomeCaged(message, true);
         else if (processedMsg.startsWith("escape")) await this.escapeCage(message);
         else if (processedMsg.startsWith("release")) await this.releaseCage(message);
         else if (processedMsg.startsWith("help")) await this.helpText(message);
@@ -84,8 +85,20 @@ export class CageBot {
     } else setTimeout(() => this.processMessage(), 1000);
   }
 
-  async becomeCaged(message: PrivateMessage): Promise<void> {
+  async becomeCaged(message: PrivateMessage, isHamster: boolean = false): Promise<void> {
     const clanName = message.msg.slice(5);
+    //set up choice adventures
+    let grateChoice = 3;
+    let valveChoice = 3;
+    let cageChoice = 3;
+    if (isHamster) {
+      //skip all non-grate noncombats by turning them to (CLEESH) combats
+      valveChoice = 2;
+      cageChoice = 2;
+    }
+    //these many grates are to be opened in hamster mode
+    //TODO: figure out a way to read this from the chat message?
+    const hamsterGrates = 11;
     console.log(`${message.who.name} (#${message.who.id}) requested caging in clan "${clanName}"`);
     if (this._amCaged) {
       console.log(`Already caged. Sending status report instead.`);
@@ -136,7 +149,11 @@ export class CageBot {
               `Attempting to get caged in ${targetClan.name}.`
             );
             console.log(`Beginning turns in ${targetClan.name} sewers.`);
-            while (!this._amCaged && (await this._client.getAdvs()) > 11 && (await this._client.getDrunk()) <= 14) {
+            while (
+              !this._amCaged &&
+              (await this._client.getAdvs()) > 11 &&
+              (await this._client.getDrunk()) <= 14
+            ) {
               const adventureResponse = await this._client.visitUrl("adventure.php", {
                 snarfblat: 166,
               });
@@ -150,21 +167,32 @@ export class CageBot {
               } else if (/Disgustin\' Junction/.test(adventureResponse)) {
                 await this._client.visitUrl("choice.php", {
                   whichchoice: 198,
-                  option: 3,
+                  option: grateChoice,
                 });
-                grates += 1;
-                console.log(`Opened grate. Grate(s) so far: ${grates}.`);
+                //some grates happen in hamsters
+                if (!isHamster || grates < hamsterGrates) {
+                  grates += 1;
+                  console.log(`Opened grate. Grate(s) so far: ${grates}.`);
+                }
+                //but if enough grates happen, then it's time to stop opening them
+                if (isHamster && grates >= hamsterGrates) {
+                  grateChoice = 2;
+                  console.log(`Hit hamster grate total: ${hamsterGrates}.`);
+                }
               } else if (/Somewhat Higher and Mostly Dry/.test(adventureResponse)) {
                 await this._client.visitUrl("choice.php", {
                   whichchoice: 197,
-                  option: 3,
+                  option: valveChoice,
                 });
-                valves += 1;
-                console.log(`Opened valve. Valve(s) so far: ${valves}.`);
+                //the valve turn only happens in non-hamster mode
+                if (!isHamster) {
+                  valves += 1;
+                  console.log(`Opened valve. Valve(s) so far: ${valves}.`);
+                }
               } else if (/The Former or the Ladder/.test(adventureResponse)) {
                 await this._client.visitUrl("choice.php", {
                   whichchoice: 199,
-                  option: 3,
+                  option: cageChoice,
                 });
               } else if (/Pop!/.test(adventureResponse)) {
                 await this._client.visitUrl("choice.php", {
@@ -190,7 +218,7 @@ export class CageBot {
                 message.who,
                 `Clang! I am now caged in ${targetClan.name}. Release me later by whispering "escape" to me.`
               );
-            } else if ( !(await this.advLeft(message)) ) {
+            } else if (!(await this.advLeft(message))) {
               console.log(
                 `Ran out of adventures attempting to get caged in clan ${targetClan.name}. Aborting.`
               );
@@ -326,12 +354,12 @@ export class CageBot {
         `I am not presently caged and have ${await this._client.getAdvs()} adventures left.`
       );
     }
-	//always send info on how full the bot is.
-	//todo: assumes max values. Should check for actual
-	await this._client.sendPrivateMessage(
-        message.who,
-        `My current fullness is ${await this._client.getFull()}/15 and drunkeness is ${await this._client.getDrunk()}/14.`
-      );
+    //always send info on how full the bot is.
+    //todo: assumes max values. Should check for actual
+    await this._client.sendPrivateMessage(
+      message.who,
+      `My current fullness is ${await this._client.getFull()}/15 and drunkeness is ${await this._client.getDrunk()}/14.`
+    );
   }
 
   async didntUnderstand(message: PrivateMessage): Promise<void> {
@@ -361,72 +389,71 @@ export class CageBot {
 
   async chewOut(): Promise<void> {
     const adventureResponse = await this._client.visitUrl("adventure.php", {
-		snarfblat: 166,
-	  });
+      snarfblat: 166,
+    });
 
-	if (/Despite All Your Rage/.test(adventureResponse)) {
-	await this._client.visitUrl("choice.php", {
-		whichchoice: 212,
-		option: 1,
-	});
-	} else if (/Pop!/.test(adventureResponse)) {
-	await this._client.visitUrl("choice.php", {
-		whichchoice: 296,
-		option: 1,
-	});
-	}
-	  
+    if (/Despite All Your Rage/.test(adventureResponse)) {
+      await this._client.visitUrl("choice.php", {
+        whichchoice: 212,
+        option: 1,
+      });
+    } else if (/Pop!/.test(adventureResponse)) {
+      await this._client.visitUrl("choice.php", {
+        whichchoice: 296,
+        option: 1,
+      });
+    }
+
     this._amCaged = false;
     this._cageStatus = undefined;
   }
 
   async advLeft(message: PrivateMessage): Promise<boolean> {
     const beforeAdv = await this._client.getAdvs();
-	if (beforeAdv > 11){
-		return true;
-	}
-	
-	const currentFull = await this._client.getFull();
-	const currentDrunk = await this._client.getDrunk();	
-	if((currentFull >=15) && (currentDrunk >= 14)){
-		// have consumed as much as we can for the day and low on adventures
-		return false;
-	}
+    if (beforeAdv > 11) {
+      return true;
+    }
 
-	const currentLevel = await this._client.getLevel();
-	let itemConsumed = "";
-	if ((currentFull <= 9) && (currentLevel >= 8)){
-		//eat Fleetwood Mac 'n' Cheese since >= 6 fullness available and sufficient level
-		itemConsumed = "Fleetwood mac 'n' cheese";
-		console.log(`Attempting to eat ${itemConsumed}`);
-		this._client.eat(7215);
-	}
-	else if ((currentFull <= 12) && (currentLevel >= 7)){
-		//eat Crimbo pie since >= 3 fullness available and sufficient level
-		itemConsumed = "Crimbo pie";
-		console.log(`Attempting to eat ${itemConsumed}`);
-		this._client.eat(2767);
-	}
-	else if ((currentDrunk <= 8) && (currentLevel >= 11)){
-		//drink Psychotic Train wine since >= 6 drunk available and sufficient level
-		itemConsumed = "Psychotic Train wine";
-		console.log(`Attempting to drink ${itemConsumed}`);
-		this._client.drink(7370);
-	}
-	else if (currentDrunk <= 12){
-		//drink middle of the road since >= 2 drunk available 
-		itemConsumed = "Middle of the Road™ brand whiskey";
-		console.log(`Attempting to drink ${itemConsumed}`);
-		this._client.drink(9948);
-	}
+    const currentFull = await this._client.getFull();
+    const currentDrunk = await this._client.getDrunk();
+    if (currentFull >= 15 && currentDrunk >= 14) {
+      // have consumed as much as we can for the day and low on adventures
+      return false;
+    }
 
-	const afterAdv = await this._client.getAdvs();
-	if(beforeAdv === afterAdv){
-		console.log(`I am out of ${itemConsumed}.`);
-		this._client.sendPrivateMessage(message.who, `Please tell my operator that I am out of ${itemConsumed}.`);
-	}
+    const currentLevel = await this._client.getLevel();
+    let itemConsumed = "";
+    if (currentFull <= 9 && currentLevel >= 8) {
+      //eat Fleetwood Mac 'n' Cheese since >= 6 fullness available and sufficient level
+      itemConsumed = "Fleetwood mac 'n' cheese";
+      console.log(`Attempting to eat ${itemConsumed}`);
+      this._client.eat(7215);
+    } else if (currentFull <= 12 && currentLevel >= 7) {
+      //eat Crimbo pie since >= 3 fullness available and sufficient level
+      itemConsumed = "Crimbo pie";
+      console.log(`Attempting to eat ${itemConsumed}`);
+      this._client.eat(2767);
+    } else if (currentDrunk <= 8 && currentLevel >= 11) {
+      //drink Psychotic Train wine since >= 6 drunk available and sufficient level
+      itemConsumed = "Psychotic Train wine";
+      console.log(`Attempting to drink ${itemConsumed}`);
+      this._client.drink(7370);
+    } else if (currentDrunk <= 12) {
+      //drink middle of the road since >= 2 drunk available
+      itemConsumed = "Middle of the Road™ brand whiskey";
+      console.log(`Attempting to drink ${itemConsumed}`);
+      this._client.drink(9948);
+    }
 
-	return afterAdv > 11;
+    const afterAdv = await this._client.getAdvs();
+    if (beforeAdv === afterAdv) {
+      console.log(`I am out of ${itemConsumed}.`);
+      this._client.sendPrivateMessage(
+        message.who,
+        `Please tell my operator that I am out of ${itemConsumed}.`
+      );
+    }
 
+    return afterAdv > 11;
   }
 }
