@@ -1,5 +1,5 @@
-import { KoLClan, KoLClient, KoLUser, PrivateMessage } from "./KoLClient";
 import { Mutex } from "async-mutex";
+import { KoLClan, KoLClient, KoLUser, PrivateMessage } from "./KoLClient";
 
 type CagedStatus = {
   requester: KoLUser;
@@ -20,7 +20,7 @@ export class CageBot {
   }
 
   start(): void {
-    console.log("Starting Cagebot...");
+    console.log("Starting BAFHbot...");
     this.initialSetup().then(() => {
       console.log("Initial setup complete. Polling messages.");
       setInterval(
@@ -32,38 +32,11 @@ export class CageBot {
   }
 
   async initialSetup(): Promise<void> {
-    this._amCaged = /Despite All Your Rage/.test(await this._client.visitUrl("place.php"));
-    if (!this._amCaged) {
-      if (!/CAGEBOT/.test(await this._client.visitUrl("account_combatmacros.php"))) {
-        console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        console.log("!!!WARNINGWARNINGWARNINGWARNINGWARNING!!!");
-        console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        console.log("!!! In order to function, this account!!!");
-        console.log("!!! MUST have a macro named CAGEBOT   !!!");
-        console.log('!!! reading "runaway;repeat;". Please !!!');
-        console.log("!!! make that now and rerun.          !!!");
-        console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        console.log("!!!WARNINGWARNINGWARNINGWARNINGWARNING!!!");
-        console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        throw "Macro required to continue.";
-      } else {
-        const combatTab = await this._client.visitUrl("account.php", {
-          tab: "combat",
-        });
-        const macroId = combatTab.match(/value="(\d+)">CAGEBOT/)[1];
-        await this._client.visitUrl("account.php", {
-          am: 1,
-          action: "flag_aabosses",
-          value: 1,
-          ajax: 1,
-        });
-        await this._client.visitUrl("account.php", {
-          am: 1,
-          action: "autoattack",
-          value: macroId,
-          ajax: 1,
-        });
-      }
+    // put a check to make sure we're in the right clan here
+    const clan = await this._client.myClan();
+    const correctclan: KoLClan = { name: "Bonus Adventures From Hell", id: "90485" };
+    if (clan !== "Bonus Adventures From Hell") {
+      await this._client.joinClan(correctclan);
     }
   }
 
@@ -74,14 +47,22 @@ export class CageBot {
         console.log(`Processing whisper from ${message.who.name} (#${message.who.id})`);
         const processedMsg = message.msg.toLowerCase();
         if (processedMsg.startsWith("status")) await this.statusReport(message, true);
-        else if (processedMsg.startsWith("cage")) await this.becomeCaged(message);
-        else if (processedMsg.startsWith("escape")) await this.escapeCage(message);
-        else if (processedMsg.startsWith("release")) await this.releaseCage(message);
+        else if (processedMsg.startsWith("whitelist")) await this.whitelistBafh(message);
         else if (processedMsg.startsWith("help")) await this.helpText(message);
         else await this.didntUnderstand(message);
       });
       this.processMessage();
     } else setTimeout(() => this.processMessage(), 1000);
+  }
+
+  async whitelistBafh(message: PrivateMessage): Promise<void> {
+    console.log(`Whitelisting ${message.who.name} to BAFH`);
+    await this._client.visitUrl(
+      `clan_whitelist.php?action=add`,
+      { addwho: message.who.name, level: 0, title: "beepboop" },
+      true
+    );
+    await this._client.sendPrivateMessage(message.who, "Welcome to Bonus Hell!");
   }
 
   async becomeCaged(message: PrivateMessage): Promise<void> {
@@ -136,7 +117,11 @@ export class CageBot {
               `Attempting to get caged in ${targetClan.name}.`
             );
             console.log(`Beginning turns in ${targetClan.name} sewers.`);
-            while (!this._amCaged && (await this._client.getAdvs()) > 11 && (await this._client.getDrunk()) <= 14) {
+            while (
+              !this._amCaged &&
+              (await this._client.getAdvs()) > 11 &&
+              (await this._client.getDrunk()) <= 14
+            ) {
               const adventureResponse = await this._client.visitUrl("adventure.php", {
                 snarfblat: 166,
               });
@@ -190,7 +175,7 @@ export class CageBot {
                 message.who,
                 `Clang! I am now caged in ${targetClan.name}. Release me later by whispering "escape" to me.`
               );
-            } else if ( !(await this.advLeft(message)) ) {
+            } else if (!(await this.advLeft(message))) {
               console.log(
                 `Ran out of adventures attempting to get caged in clan ${targetClan.name}. Aborting.`
               );
@@ -268,21 +253,13 @@ export class CageBot {
       message.who,
       `Hi! I am ${this._client.getMe()?.name} (#${
         this._client.getMe()?.id
-      }), and I am running Phillammon's Cagebot script.`
+      }), and I am running a hacked apart version of Phillammon's Cagebot script.`
     );
     await this._client.sendPrivateMessage(message.who, `My commands:`);
     await this._client.sendPrivateMessage(message.who, `- status: Get my current status`);
     await this._client.sendPrivateMessage(
       message.who,
-      `- cage [clanname]: Try to get caged in the specified clan's hobopolis instance`
-    );
-    await this._client.sendPrivateMessage(
-      message.who,
-      `- escape: If you're the person who requested I got caged, chews out of the cage I'm in`
-    );
-    await this._client.sendPrivateMessage(
-      message.who,
-      `- release: Chew out of the cage, REGARDLESS of who is responsible for the caging. Only usable if I've been caged for an hour or something's gone wrong.`
+      `- whitelist: get whitelisted to Bonus Adventures From Hell`
     );
     await this._client.sendPrivateMessage(message.who, `- help: Displays this message.`);
   }
@@ -290,48 +267,12 @@ export class CageBot {
   async statusReport(message: PrivateMessage, directlyRequested: boolean = false): Promise<void> {
     if (directlyRequested)
       console.log(`${message.who.name} (#${message.who.id}) requested status report.`);
-    if (this._amCaged) {
-      if (this._cageStatus) {
-        const cageSecs = this.secondsInCage();
-        await this._client.sendPrivateMessage(
-          message.who,
-          `I have been caged in ${this._cageStatus.clan} for ${this.humanReadableTime(
-            cageSecs
-          )}, at the request of ${this._cageStatus.requester.name} (#${
-            this._cageStatus.requester.id
-          }).`
-        );
-        if (this.releaseable()) {
-          await this._client.sendPrivateMessage(
-            message.who,
-            `As I've been caged for at least an hour, anyone can release me by whispering "release" to me. I have ${await this._client.getAdvs()} adventures left.`
-          );
-        } else {
-          await this._client.sendPrivateMessage(
-            message.who,
-            `They can release me at any time by whispering "escape" to me, or anyone can release me by whispering "release" to me in ${this.humanReadableTime(
-              3600 - cageSecs
-            )}. I have ${await this._client.getAdvs()} adventures left.`
-          );
-        }
-      } else {
-        await this._client.sendPrivateMessage(
-          message.who,
-          `I am caged, but I don't know where, when, or for how long. Anyone can release me by whispering "release" to me. I have ${await this._client.getAdvs()} adventures left.`
-        );
-      }
-    } else {
-      await this._client.sendPrivateMessage(
-        message.who,
-        `I am not presently caged and have ${await this._client.getAdvs()} adventures left.`
-      );
-    }
-	//always send info on how full the bot is.
-	//todo: assumes max values. Should check for actual
-	await this._client.sendPrivateMessage(
-        message.who,
-        `My current fullness is ${await this._client.getFull()}/15 and drunkeness is ${await this._client.getDrunk()}/14.`
-      );
+    //always send info on how full the bot is.
+    //todo: assumes max values. Should check for actual
+    await this._client.sendPrivateMessage(
+      message.who,
+      `My current status is: waiting for the downfall of the auto industry`
+    );
   }
 
   async didntUnderstand(message: PrivateMessage): Promise<void> {
@@ -361,72 +302,71 @@ export class CageBot {
 
   async chewOut(): Promise<void> {
     const adventureResponse = await this._client.visitUrl("adventure.php", {
-		snarfblat: 166,
-	  });
+      snarfblat: 166,
+    });
 
-	if (/Despite All Your Rage/.test(adventureResponse)) {
-	await this._client.visitUrl("choice.php", {
-		whichchoice: 212,
-		option: 1,
-	});
-	} else if (/Pop!/.test(adventureResponse)) {
-	await this._client.visitUrl("choice.php", {
-		whichchoice: 296,
-		option: 1,
-	});
-	}
-	  
+    if (/Despite All Your Rage/.test(adventureResponse)) {
+      await this._client.visitUrl("choice.php", {
+        whichchoice: 212,
+        option: 1,
+      });
+    } else if (/Pop!/.test(adventureResponse)) {
+      await this._client.visitUrl("choice.php", {
+        whichchoice: 296,
+        option: 1,
+      });
+    }
+
     this._amCaged = false;
     this._cageStatus = undefined;
   }
 
   async advLeft(message: PrivateMessage): Promise<boolean> {
     const beforeAdv = await this._client.getAdvs();
-	if (beforeAdv > 11){
-		return true;
-	}
-	
-	const currentFull = await this._client.getFull();
-	const currentDrunk = await this._client.getDrunk();	
-	if((currentFull >=15) && (currentDrunk >= 14)){
-		// have consumed as much as we can for the day and low on adventures
-		return false;
-	}
+    if (beforeAdv > 11) {
+      return true;
+    }
 
-	const currentLevel = await this._client.getLevel();
-	let itemConsumed = "";
-	if ((currentFull <= 9) && (currentLevel >= 8)){
-		//eat Fleetwood Mac 'n' Cheese since >= 6 fullness available and sufficient level
-		itemConsumed = "Fleetwood mac 'n' cheese";
-		console.log(`Attempting to eat ${itemConsumed}`);
-		this._client.eat(7215);
-	}
-	else if ((currentFull <= 12) && (currentLevel >= 7)){
-		//eat Crimbo pie since >= 3 fullness available and sufficient level
-		itemConsumed = "Crimbo pie";
-		console.log(`Attempting to eat ${itemConsumed}`);
-		this._client.eat(2767);
-	}
-	else if ((currentDrunk <= 8) && (currentLevel >= 11)){
-		//drink Psychotic Train wine since >= 6 drunk available and sufficient level
-		itemConsumed = "Psychotic Train wine";
-		console.log(`Attempting to drink ${itemConsumed}`);
-		this._client.drink(7370);
-	}
-	else if (currentDrunk <= 12){
-		//drink middle of the road since >= 2 drunk available 
-		itemConsumed = "Middle of the Road™ brand whiskey";
-		console.log(`Attempting to drink ${itemConsumed}`);
-		this._client.drink(9948);
-	}
+    const currentFull = await this._client.getFull();
+    const currentDrunk = await this._client.getDrunk();
+    if (currentFull >= 15 && currentDrunk >= 14) {
+      // have consumed as much as we can for the day and low on adventures
+      return false;
+    }
 
-	const afterAdv = await this._client.getAdvs();
-	if(beforeAdv === afterAdv){
-		console.log(`I am out of ${itemConsumed}.`);
-		this._client.sendPrivateMessage(message.who, `Please tell my operator that I am out of ${itemConsumed}.`);
-	}
+    const currentLevel = await this._client.getLevel();
+    let itemConsumed = "";
+    if (currentFull <= 9 && currentLevel >= 8) {
+      //eat Fleetwood Mac 'n' Cheese since >= 6 fullness available and sufficient level
+      itemConsumed = "Fleetwood mac 'n' cheese";
+      console.log(`Attempting to eat ${itemConsumed}`);
+      this._client.eat(7215);
+    } else if (currentFull <= 12 && currentLevel >= 7) {
+      //eat Crimbo pie since >= 3 fullness available and sufficient level
+      itemConsumed = "Crimbo pie";
+      console.log(`Attempting to eat ${itemConsumed}`);
+      this._client.eat(2767);
+    } else if (currentDrunk <= 8 && currentLevel >= 11) {
+      //drink Psychotic Train wine since >= 6 drunk available and sufficient level
+      itemConsumed = "Psychotic Train wine";
+      console.log(`Attempting to drink ${itemConsumed}`);
+      this._client.drink(7370);
+    } else if (currentDrunk <= 12) {
+      //drink middle of the road since >= 2 drunk available
+      itemConsumed = "Middle of the Road™ brand whiskey";
+      console.log(`Attempting to drink ${itemConsumed}`);
+      this._client.drink(9948);
+    }
 
-	return afterAdv > 11;
+    const afterAdv = await this._client.getAdvs();
+    if (beforeAdv === afterAdv) {
+      console.log(`I am out of ${itemConsumed}.`);
+      this._client.sendPrivateMessage(
+        message.who,
+        `Please tell my operator that I am out of ${itemConsumed}.`
+      );
+    }
 
+    return afterAdv > 11;
   }
 }
