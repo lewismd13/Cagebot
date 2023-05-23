@@ -1,8 +1,8 @@
 import axios from "axios";
-import { select } from "xpath";
-import { DOMParser as dom } from "xmldom";
-import { Agent as httpsAgent } from "https";
 import { Agent as httpAgent } from "http";
+import { Agent as httpsAgent } from "https";
+import { DOMParser as dom } from "xmldom";
+import { select } from "xpath";
 
 axios.defaults.timeout = 30000;
 axios.defaults.httpAgent = new httpAgent({ keepAlive: true });
@@ -77,7 +77,7 @@ export class KoLClient {
       });
       return apiResponse.status === 200;
     } catch {
-      console.log("Login check failed, returning false to be safe.")
+      console.log("Login check failed, returning false to be safe.");
       return false;
     }
   }
@@ -114,19 +114,21 @@ export class KoLClient {
         id: apiResponse.data.playerid,
         name: apiResponse.data.name,
       };
-      return true
+      return true;
     } catch {
-      console.log("Login failed. Checking if it's because of rollover.")
-      await this.rolloverCheck()
-      return false
+      console.log("Login failed. Checking if it's because of rollover.");
+      await this.rolloverCheck();
+      return false;
     }
   }
 
   async rolloverCheck() {
-    this._isRollover = /The system is currently down for nightly maintenance/.test((await axios("https://www.kingdomofloathing.com/")).data);
+    this._isRollover = /The system is currently down for nightly maintenance/.test(
+      (await axios("https://www.kingdomofloathing.com/")).data
+    );
     if (this._isRollover) {
-      console.log("Rollover appears to be in progress. Checking again in one minute.")
-      setTimeout(() => this.rolloverCheck(), 60000)
+      console.log("Rollover appears to be in progress. Checking again in one minute.");
+      setTimeout(() => this.rolloverCheck(), 60000);
     }
   }
 
@@ -135,7 +137,7 @@ export class KoLClient {
     parameters: Record<string, any> = {},
     pwd: Boolean = true
   ): Promise<any> {
-    if (this._isRollover || !await this.logIn()) return null;
+    if (this._isRollover || !(await this.logIn())) return null;
     try {
       const page = await axios(`https://www.kingdomofloathing.com/${url}`, {
         method: "POST",
@@ -148,6 +150,33 @@ export class KoLClient {
           ...parameters,
         },
       });
+
+      if (page.headers["set-cookie"] && this._credentials != null) {
+        const cookies: any = {};
+
+        for (let [name, cookie] of this._credentials.sessionCookies
+          .split("; ")
+          .map((s) => s.split("="))) {
+          if (!cookie) {
+            continue;
+          }
+
+          cookies[name] = cookie;
+        }
+
+        const sessionCookies = page.headers["set-cookie"].map((cookie: string) =>
+          cookie.split(";")[0].trim().split("=")
+        );
+
+        for (let [name, cookie] of sessionCookies) {
+          cookies[name] = cookie;
+        }
+
+        this._credentials.sessionCookies = Object.entries(cookies)
+          .map(([key, value]) => `${key}=${value}`)
+          .join("; ");
+      }
+
       return page.data;
     } catch {
       return null;
@@ -166,17 +195,17 @@ export class KoLClient {
   }
 
   async eat(foodID: number): Promise<void> {
-	await this.visitUrl("inv_eat.php", {
-		which: 1,
-		whichitem: foodID,
-	  });
+    await this.visitUrl("inv_eat.php", {
+      which: 1,
+      whichitem: foodID,
+    });
   }
 
   async drink(drinkID: number): Promise<void> {
-	await this.visitUrl("inv_booze.php", {
-		which: 1,
-		whichitem: drinkID,
-	  });
+    await this.visitUrl("inv_booze.php", {
+      which: 1,
+      whichitem: drinkID,
+    });
   }
 
   async fetchNewWhispers(): Promise<PrivateMessage[]> {
@@ -184,7 +213,7 @@ export class KoLClient {
       j: 1,
       lasttime: this._lastFetchedMessages,
     });
-    if (!newChatMessagesResponse) return []
+    if (!newChatMessagesResponse) return [];
     this._lastFetchedMessages = newChatMessagesResponse["last"];
     const newWhispers: PrivateMessage[] = newChatMessagesResponse["msgs"]
       .filter((msg: KOLMessage) => msg["type"] === "private")
@@ -198,7 +227,7 @@ export class KoLClient {
 
   async getWhitelists(): Promise<KoLClan[]> {
     const clanRecuiterResponse = await this.visitUrl("clan_signup.php");
-    if (!clanRecuiterResponse) return []
+    if (!clanRecuiterResponse) return [];
     const clanIds = select(
       '//select[@name="whichclan"]/option/@value',
       parser.parseFromString(clanRecuiterResponse, "text/xml")
@@ -270,6 +299,4 @@ export class KoLClient {
     if (apiResponse) return parseInt(apiResponse["level"], 10);
     return 0;
   }
-
-  
 }
