@@ -48,6 +48,7 @@ export class CageBot {
         const processedMsg = message.msg.toLowerCase();
         if (processedMsg.startsWith("status")) await this.statusReport(message, true);
         else if (processedMsg.startsWith("whitelist")) await this.whitelistBafh(message);
+        else if (processedMsg.startsWith("dungeon")) await this.updateRank(message);
         else if (processedMsg.startsWith("help")) await this.helpText(message);
         else await this.didntUnderstand(message);
       });
@@ -63,6 +64,19 @@ export class CageBot {
       true
     );
     await this._client.sendPrivateMessage(message.who, "Welcome to Bonus Hell!");
+  }
+
+  async updateRank(message: PrivateMessage): Promise<void> {
+    console.log(`Giving ${message.who.name} dungeon privileges`);
+    await this._client.visitUrl(
+      `clan_members.php?action=modify`,
+      { modifywho: message.who.name, level: 2, title: "boopbeep" },
+      true
+    );
+    await this._client.sendPrivateMessage(
+      message.who,
+      "You can now adventure in BAFH dungeons. Please behave!"
+    );
   }
 
   async becomeCaged(message: PrivateMessage): Promise<void> {
@@ -260,6 +274,10 @@ export class CageBot {
     await this._client.sendPrivateMessage(
       message.who,
       `- whitelist: get whitelisted to Bonus Adventures From Hell`
+    );
+    await this._client.sendPrivateMessage(
+      message.who,
+      `- dungeon: get clan dungeon privileges in BafH`
     );
     await this._client.sendPrivateMessage(message.who, `- help: Displays this message.`);
   }
