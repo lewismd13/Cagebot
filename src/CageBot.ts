@@ -70,7 +70,7 @@ export class CageBot {
     console.log(`Giving ${message.who.name} dungeon privileges`);
     await this._client.visitUrl(
       `clan_members.php?action=modify&pids[]=${message.who.id}&level${message.who.id}=2`,
-      { title: "boopbeep" },
+      {},
       true
     );
     await this._client.sendPrivateMessage(
