@@ -69,8 +69,8 @@ export class CageBot {
   async updateRank(message: PrivateMessage): Promise<void> {
     console.log(`Giving ${message.who.name} dungeon privileges`);
     await this._client.visitUrl(
-      `clan_members.php?action=modify`,
-      { modifywho: message.who.id, level: 2, title: "boopbeep" },
+      `clan_members.php?action=modify?pids[]=${message.who.id}?level${message.who.id}=2`,
+      { title: "boopbeep" },
       true
     );
     await this._client.sendPrivateMessage(
@@ -277,7 +277,7 @@ export class CageBot {
     );
     await this._client.sendPrivateMessage(
       message.who,
-      `- dungeon: get clan dungeon privileges in BafH`
+      `- dungeon: get clan dungeon privileges in BafH. Note: you must currently be in BafH for this to work`
     );
     await this._client.sendPrivateMessage(message.who, `- help: Displays this message.`);
   }
