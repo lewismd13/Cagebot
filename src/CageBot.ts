@@ -289,7 +289,7 @@ export class CageBot {
     //todo: assumes max values. Should check for actual
     await this._client.sendPrivateMessage(
       message.who,
-      `My current status is: waiting for the downfall of the auto industry`
+      `My current status is: waiting for the downfall of the auto industry. Hello v1`
     );
   }
 
