@@ -65,12 +65,25 @@ export class CageBot {
     );
     await this._client.sendPrivateMessage(message.who, "Welcome to Bonus Hell!");
   }
-
+  /*
   async updateRank(message: PrivateMessage): Promise<void> {
     console.log(`Giving ${message.who.name} dungeon privileges`);
     await this._client.visitUrl(
       `clan_members.php?action=modify&pids[]=${message.who.id}&level${message.who.id}=2`,
       {},
+      true
+    );
+    await this._client.sendPrivateMessage(
+      message.who,
+      "You can now adventure in BAFH dungeons. Please behave!"
+    );
+  }
+*/
+  async updateRank(message: PrivateMessage): Promise<void> {
+    console.log(`Giving ${message.who.name} dungeon privileges`);
+    await this._client.visitUrl(
+      `clan_whitelist.php?level${message.who.id}=2&title${message.who.id}=dungeoned`,
+      { action: "updatewl", who: message.who.id, update: "Update" },
       true
     );
     await this._client.sendPrivateMessage(
@@ -277,7 +290,7 @@ export class CageBot {
     );
     await this._client.sendPrivateMessage(
       message.who,
-      `- dungeon: get clan dungeon privileges in BafH. Note: you must currently be in BafH for this to work`
+      `- dungeon: get clan dungeon privileges in BafH. Note: you must NOT be in BafH for this to work`
     );
     await this._client.sendPrivateMessage(message.who, `- help: Displays this message.`);
   }
@@ -289,7 +302,7 @@ export class CageBot {
     //todo: assumes max values. Should check for actual
     await this._client.sendPrivateMessage(
       message.who,
-      `My current status is: waiting for the downfall of the auto industry. Hello v1`
+      `My current status is: waiting for the downfall of the auto industry. Hello v2`
     );
   }
 
