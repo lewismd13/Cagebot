@@ -4,7 +4,7 @@ import { Agent as httpsAgent } from "https";
 import { DOMParser as dom } from "xmldom";
 import { select } from "xpath";
 
-axios.defaults.timeout = 30000;
+axios.defaults.timeout = 69420;
 axios.defaults.httpAgent = new httpAgent({ keepAlive: true });
 axios.defaults.httpsAgent = new httpsAgent({ keepAlive: true });
 

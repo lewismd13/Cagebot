@@ -1,4 +1,5 @@
 import { Mutex } from "async-mutex";
+import * as fs from "node:fs";
 import { KoLClan, KoLClient, KoLUser, PrivateMessage } from "./KoLClient";
 
 type CagedStatus = {
@@ -81,11 +82,17 @@ export class CageBot {
 */
   async updateRank(message: PrivateMessage): Promise<void> {
     console.log(`Giving ${message.who.name} dungeon privileges`);
-    await this._client.visitUrl(
-      `clan_whitelist.php?level${message.who.id}=2&title${message.who.id}=dungeoned`,
-      { action: "updatewl", who: message.who.id, update: "Update" },
-      true
-    );
+    const params = {
+      action: "updatewl",
+      who: message.who.id,
+      [`level${message.who.id}`]: "2",
+      [`title${message.who.id}`]: "dungeoned",
+      update: "Update",
+    };
+    console.log(JSON.stringify(params));
+    const result = await this._client.visitUrl("clan_whitelist.php", params, true);
+    // console.log(result);
+    fs.writeFileSync("output.html", result);
     await this._client.sendPrivateMessage(
       message.who,
       "You can now adventure in BAFH dungeons. Please behave!"
